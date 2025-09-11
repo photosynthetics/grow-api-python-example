@@ -1,0 +1,280 @@
+syntax =  "proto3";
+import "google/protobuf/duration.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+// ############################################//
+// Shared with embedded components
+// ############################################//
+
+enum PbGrowLightLengthType {
+  SIXTY_CM = 0;
+  HUNDRED_TWENTY_CM = 1;
+  TWO_HUNDRED_FORTY_CM = 2;
+}
+enum PbGrowLightLedType {
+LED_TYPE_V1 = 0;
+}
+
+enum GrowDeviceType {
+grow_light_v1 = 0;
+grow_light_sensor_v1 = 1;
+grow_rdm_dmx_controller_v1 = 2;
+grow_sensor_board = 3;
+}
+
+enum PbGrowSensorType {
+  TEMP_HUMID_SHT40 = 0;
+  LIGHT_AS7343 = 1;
+  DISTANCE_VL53L8X = 2;
+}
+
+message VersionMessage {
+  optional uint32 major = 1;
+  optional uint32 minor = 2;
+  optional uint32 revision = 3;
+  optional uint32 build = 4;
+}
+message SerialNumberMessage {
+  optional bytes data = 1;
+}
+
+message GrowLightStateMessage {
+  optional float pcb_temperature_c = 1;
+  optional float emitter_temperature_c = 2;
+  optional float voltage = 3;
+  optional float current = 4;
+  optional float power_draw = 5;
+  repeated float pwm_outputs = 6;
+}
+
+message GrowLightSensorStateMessage {
+  optional float pcb_temperature_c = 1;
+  optional float emitter_temperature_c = 2;
+  optional float voltage = 3;
+  optional float current = 4;
+  optional float power_draw = 5;
+  optional bool is_streaming_measurements = 6;
+  optional As7343MeasurementMessage as7343_measurement = 7;
+}
+
+message GrowSensorBoardStateMessage {
+optional float pcb_temperature_c = 1;
+optional float emitter_temperature_c = 2;
+optional float voltage = 3;
+optional float current = 4;
+optional float power_draw = 5;
+
+optional bool capability_light_sensor_as7343 = 6;
+optional bool capability_temp_humid_sht40 = 7;
+optional bool capability_distance_vl53l8cx = 8;
+}
+
+message As7343MeasurementMessage {
+//  F1, F2, FZ, F3, F4, FY, F5, FXL, F6, F7, F8, NIR
+//repeated double basic_counts = 1; dont have the capacity to send 12* doubles 
+repeated float stored_dark_offsets = 1;
+repeated uint32 raw_counts = 2; 
+uint32 int_step_size = 3; 
+uint32 int_step_count = 4;
+float integration_time_ms = 5;
+float gain_value = 6;
+uint32 gain_enum_value = 7;
+uint32 measurement_time_ms = 9;
+float adc_utilization = 10;
+uint64 timestamp = 11;
+}
+
+message ProcessedLightSensorMeasurementMessage {
+  float pfd_360_780nm = 1;
+  float ppfd_400_700nm = 2;
+  float ppfd_400_500nm = 3;
+  float ppfd_500_600nm = 4;
+  float ppfd_600_700nm = 5;
+  bool has_sliding_window_average = 6;
+  float sliding_window_average_pfd_360_780nm = 7;
+  float sliding_window_average_ppfd_400_700nm = 8;
+  float sliding_window_average_ppfd_400_500nm = 9;
+  float sliding_window_average_ppfd_500_600nm = 10;
+  float sliding_window_average_ppfd_600_700nm = 11;
+  uint32 sliding_window_size = 12;
+  uint64 timestamp = 13;
+  float scaling_factor = 14;
+}
+
+message Sht40MeasurementMessage {
+bool did_use_heater = 1;
+float temperature = 2;
+float humidity = 3;
+float temperature_with_heater = 4;
+float humidity_with_heater = 5;
+uint64 timestamp = 6;
+}
+
+
+enum Vl53l8cxPartialDataType {
+DISTANCE_MM = 0;
+// AMBIENT_PER_SPAD = 1;
+// NB_TARGET_DETECTED = 2;
+// NB_SPADS_ENABLED = 3;
+}
+message Vl53l8cxPartialData {
+Vl53l8cxPartialDataType type = 1;
+bytes data = 2;
+} 
+
+message SensorDataRequest {
+oneof which_sensor {
+  LightSensorMeasurementRequest light_sensor_measurement_request = 1;
+  // Just get the latest sensor data that is already measured automatically on the board
+  // VL53 latest defaults to just distances
+  PbGrowSensorType get_latest_sensor_data = 2;
+}
+}
+enum LightSensorMeasurementRequestType {
+  AUTOMATIC_GAIN_AND_INTEGRATION_TIME = 0;
+  AUTOMATIC_GAIN_FIXED_INTEGRATION_TIME = 1;
+  MANUAL_GAIN_AND_INTEGRATION_TIME = 2;
+}
+
+message LightSensorMeasurementRequest {
+  optional LightSensorMeasurementRequestType request_type = 1;
+  optional float maximum_integration_time_ms = 2;
+  optional float gain_value = 3;
+  optional int32 gain_enum_value = 4;
+  optional float integration_time_ms = 5;
+  optional int32 timeout_ms = 6;
+  optional bool do_dark_calibration =
+      7; // This does an automatic measurement and stores them as dark basic
+         // count offsets on the external flash
+}
+
+message Vl53l8cxPartialDataRequest {
+Vl53l8cxPartialDataType request = 1;
+}
+
+message BusDeviceStateMessage {
+  optional uint64 device_uid = 1;
+  optional uint32 sessionId = 3; // a random id generated on each boot. Can help to determine if the device has rebooted.
+  optional GrowDeviceType deviceType = 4;
+  optional VersionMessage version = 5;
+  optional SerialNumberMessage serialNumber = 6;
+  oneof message_type {
+    GrowLightStateMessage growLightStateMessage = 7;
+    //GrowLightSensorStateMessage growLightSensorStateMessage = 9;
+    GrowSensorBoardStateMessage growSensorBoardStateMessage = 10;
+  }
+  optional GrowSettingsMessage growSettingsMessage = 8;
+}
+
+message GrowSettingsMessage {
+  optional uint32 password = 1;
+  optional PbGrowLightLengthType grow_light_length = 2;
+  optional PbGrowLightLedType grow_light_led_type = 3;
+  optional uint32 dmx_broadcast_group = 4;
+  // Light sensor specific 
+  optional bool stream_light_measurements = 5;
+  optional uint32 time_between_streaming_light_measurements_ms = 6;
+  optional uint32 maximum_integration_time_ms = 7;
+}
+
+message InterfaceModuleSettings {
+  optional google.protobuf.Duration update_submodule_interval = 1;
+}
+
+message InterfaceSubmoduleSettings {
+  optional google.protobuf.Duration update_bus_devices_interval = 1;
+}
+
+// ############################################//
+// Shared with grpc services
+// ############################################//
+message GitHubReleaseMessage {
+    string tag_name = 1;
+    string name = 2;
+    string body = 3;
+    bool draft = 4;
+    bool prerelease = 5;
+    string published_at = 6;
+    string created_at = 7;
+}
+
+message BusSensorLatestMeasurementsMessage {
+  uint64 device_uid = 1;
+  //optional As7343MeasurementMessage as7343_measurement = 2;
+  optional Sht40MeasurementMessage sht40_measurement = 3;
+  optional Vl53l8cxPartialData vl53_distances = 4;
+  optional ProcessedLightSensorMeasurementMessage processed_light_sensor_measurements = 5;
+}
+
+message InterfaceSubmoduleMessage {
+  string serial_number = 1; // MCU serial number
+  VersionMessage fw_version = 2;
+  repeated BusDeviceStateMessage grow_rdm_devices = 3;
+  InterfaceSubmoduleSettings settings = 4;
+  repeated BusSensorLatestMeasurementsMessage sensor_boards_latest_measurements = 5;
+}
+
+message UpdateInterfaceModuleRequest {
+    string id = 1;
+    GitHubReleaseMessage release = 2;
+}
+
+message InterfaceModuleMessage {
+  Status status = 1;
+  string id = 2; // Using the mac address of the interface module
+  VersionMessage sw_version = 3;
+  repeated InterfaceSubmoduleMessage interface_submodules = 4;
+  int32 session_id = 5;
+  google.protobuf.Duration uptime = 6;
+  bool is_updating_rdm_box_fw = 7;
+  InterfaceModuleSettings settings = 8;
+  string grpc_host = 9; // F.ex ip address
+  int32 grpc_port = 10;
+  VersionMessage submodule_fw_version = 11; // Version of any stored submodule firmware
+  GitStatusMessage git_status = 12; // deprecated
+  repeated GitHubReleaseMessage app_updates = 13; // Github releases available to this interface module
+}
+
+message InterfaceSubmoduleFirmwareImage {
+  VersionMessage firmware_version = 1;
+  bytes firmware_image = 2;
+}
+
+message UpdateProgressMessage {
+  Status status = 1;
+  float percent_complete = 2; // 0-100
+
+}
+
+
+message Status {
+  // The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+  int32 code = 1;
+  // A developer-facing error message, which should be in English. Any
+  // user-facing error message should be localized and sent in the
+  // [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+  string message = 2;
+  // A list of messages that carry the error details.  There is a common set of
+  // message types for APIs to use.
+  repeated google.protobuf.Any details = 3;
+}
+
+message GitStatusMessage {
+string branch = 1;
+string commit_hash = 2;
+string commit_message = 3;
+google.protobuf.Timestamp commit_utc_timestamp = 4;
+int32 commits_behind = 5;
+bool has_uncommitted_changes = 6;
+}
+
+
+message BusDeviceRequest {
+  uint64 device_uid = 1;
+  bytes data = 2;
+}
+message BusDeviceResponse {
+  Status status = 1;
+  bytes data = 2;
+}

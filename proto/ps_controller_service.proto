@@ -1,0 +1,341 @@
+syntax =  "proto3";
+import "ps_common.proto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+
+
+service PsControllerService {
+    /*  The controller stores state under project ids. The controller can only run one project at a time.
+        Running a project means that the controller is actively controlling the grow zones, lights, and other devices according 
+        to the active project's recipes, crops, and other settings.
+        Set, Get, Delete active project is used to control which project is currently active.
+    */
+    rpc UpdateServer(UpdateServerRequest) returns (Status) {}
+    rpc UpdateInterfaceModule(UpdateInterfaceModuleRequest) returns (Status) {}
+
+    rpc SetActiveProject(SetActiveProjectRequest) returns (Status) {}
+    rpc GetActiveProject(GetActiveProjectRequest) returns (ProjectId) {}
+    rpc DeleteProject(DeleteProjectRequest) returns (Status) {}
+    
+    rpc SetProjectState(SetProjectStateRequest) returns (Status) {}
+    rpc GetProjectState(ProjectId) returns (GetProjectStateResponse) {}
+    rpc GetProjectStates(google.protobuf.Empty) returns (GetProjectStatesResponse) {}
+
+    rpc GetControllerInfo(google.protobuf.Empty) returns (GetControllerInfoResponse) {}
+    // This returns a message which contains all the connected interface modules, sub modules, and bus devices connected to those sub modules.
+    rpc GetAllInterfaces(GetAllInterfacesRequest) returns (GetAllInterfacesResponse) {}
+    // This will blink a light with the specified uid 
+    rpc IdentifyBusDevice(IdentifyBusDeviceRequest) returns (Status) {}
+    // This will set the light output for the specified light uids
+    rpc SetLightOutput(SetLightOutputRequest) returns (Status) {}
+ /*
+    _____ ______ _   _  _____  ____  _____   _____ 
+   / ____|  ____| \ | |/ ____|/ __ \|  __ \ / ____|
+  | (___ | |__  |  \| | (___ | |  | | |__) | (___  
+   \___ \|  __| | . ` |\___ \| |  | |  _  / \___ \ 
+   ____) | |____| |\  |____) | |__| | | \ \ ____) |
+  |_____/|______|_| \_|_____/ \____/|_|  \_\_____/ 
+ */
+    rpc GetLightSensorMeasurements(GetLightSensorMeasurementsRequest) returns (GetLightSensorMeasurementsResponse) {}
+
+    //////////////////////////////////////////////
+    // Advanced control of grow zones, recipes/light sequences/ crops etc
+    //////////////////////////////////////////////
+    
+
+    // Enables or disables light output from a grow zone
+    rpc SetGrowZoneEnabledState(SetGrowZoneEnabledStateRequest) returns (Status) {}
+    rpc SetGrowZone(SetGrowZoneRequest) returns (Status) {}
+    rpc GetGrowZones(ProjectId) returns (GetGrowZonesResponse) {}
+
+    rpc SetActiveRecipe(SetActiveRecipeRequest) returns (Status) {}
+    rpc DeleteActiveRecipe(DeleteActiveRecipeRequest) returns (Status) {}
+    rpc GetActiveRecipes(ProjectId) returns (GetActiveRecipesResponse) {}
+
+    rpc DeleteCrop(DeleteCropRequest) returns (Status) {}
+    rpc SetCrop(SetCropRequest) returns (Status) {}
+    rpc GetCrops(ProjectId) returns (GetCropsResponse) {}
+
+    //////////////////////////////////////////////
+    // Advanced control of bus devices and interface submodules
+    //////////////////////////////////////////////
+    rpc ControllerSendDataToSubmoduleApi(ControllerSendDataToSubmoduleApiRequest) returns (ControllerSendDataToSubmoduleApiResponse) {}
+    rpc ControllerBroadcastMessageOnBus(ControllerBroadcastMessageOnBusRequest) returns (Status) {}
+    rpc ControllerToBusDeviceCommunication(BusDeviceRequest) returns (BusDeviceResponse) {}
+
+    //////////////////////////////////////////////
+    // Firmware related (updating interface submodule firmware, and bus devices firmware)
+    //////////////////////////////////////////////
+    rpc GetFirmwareOverview(google.protobuf.Empty) returns (GetFirmwareOverviewResponse) {}
+    rpc SyncFirmwareRepository(SyncFirmwareRepositoryRequest) returns (Status) {}
+    rpc UpdateInterfaceSubmodules(UpdateInterfaceSubmoduleRequest) returns (Status) {}
+    rpc UpdateBusDevices(UpdateBusDevicesFirmwareRequest) returns (stream UpdateProgressMessage) {}
+
+    //////////////////////////////////////////////
+    // Settings related
+    //////////////////////////////////////////////
+    rpc GetControllerSettings(ProjectId) returns (ControllerSettings) {}
+    rpc SetControllerSettings(SetControllerSettingsRequest) returns (Status) {}
+    rpc SetBusDeviceSettings(SetBusDeviceSettingsRequest) returns (Status) {}
+    rpc SetInterfaceSubmoduleSettings(SetInterfaceSubmoduleSettingsRequest) returns (Status) {}
+
+    // Callig this function regularly allows the controller to keep track of connected clients
+    rpc PingServer(PingServerRequest) returns (GetControllerInfoResponse) {}
+    
+    // This will delete all stored state
+    rpc DeleteControlBoxDb(google.protobuf.Empty) returns (Status) {}
+}
+
+message ProjectId {
+    /*  The project id is a unique identifier for a project 
+        The purpose is to support multiple client side projects, which can easily be activated, deactivated, and deleted.
+        The controller/server will only be actively running one project at a time. The clients can tell the controller to switch active project.
+    */
+    string project_uuid = 1;
+}
+message ClientConnectionMessage {
+    string clientUUID = 1;
+    string clientLocalIp = 2;
+    string clientPublicIp = 3;
+    VersionMessage clientVersion = 4;
+    google.protobuf.Timestamp lastPing = 5;
+    google.protobuf.Timestamp connectedAt = 6;
+}
+
+
+
+message Uint64List {
+    repeated uint64 values = 1;
+}
+
+message ChannelOutputsMessage {
+    repeated string channel_names = 1;
+    repeated float outputs = 2; // 0-100% 
+}
+
+message FirmwareReleaseMessage  {
+    string product_name = 1;
+    GrowDeviceType device_type = 2;
+    VersionMessage version = 3;
+    string changelog = 4;
+}
+
+message LightSensorMeasurementMessage {
+    uint64 sensor_uid = 1;
+    repeated ProcessedLightSensorMeasurementMessage measurements = 2;
+    repeated uint64 utc_timestamps = 3;
+}
+
+// ############################################//
+// Request and response messages for the API
+// ############################################//
+
+message UpdateServerRequest {
+    GitHubReleaseMessage release = 2;
+}
+
+message GetActiveProjectRequest {
+    ProjectId project_id = 1;
+}
+message SetActiveProjectRequest {
+    ProjectId project_id = 1;
+}
+message DeleteProjectRequest {
+    ProjectId project_id = 1;
+}
+message GetControllerInfoResponse {
+    Status status = 1;
+    ProjectId active_project = 100;
+    string id = 8; // Using the mac address
+    string name = 2;
+    string sw_version = 10;
+    int32 sessionId = 4;
+    //ControllerSettings settings = 7;
+    repeated InterfaceModuleMessage interfaces = 9;
+    repeated GitHubReleaseMessage app_updates = 11;
+    repeated ClientConnectionMessage connected_clients = 12;
+}
+
+
+message GetLightSensorMeasurementsRequest {
+    repeated uint64 sensor_uids = 1;
+    bool request_all_sensors = 2;
+}
+message GetLightSensorMeasurementsResponse {
+    Status status = 1;
+    repeated LightSensorMeasurementMessage sensor_measurements = 2;
+}
+
+message GetAllInterfacesRequest {
+    ProjectId project_id = 100;
+    bool force_update = 1;
+}
+message SetProjectStateRequest {
+    string json_project_state = 1;
+}
+message GetProjectStateResponse {
+    Status status = 1;
+    string json_project_state = 2;
+}
+message GetProjectStatesResponse {
+    Status status = 1;
+    string json_project_states = 2;
+}
+
+message DeleteActiveRecipeRequest {
+    ProjectId project_id = 100;
+    string grow_zone_id = 1;
+}
+message SetGrowZoneEnabledStateRequest {
+    ProjectId project_id = 100;
+    string grow_zone_id = 1;
+    bool enabled = 2;
+}
+
+message SetGrowZoneRequest {
+    ProjectId project_id = 100;
+    string json_grow_zone = 1;
+}
+
+message GetGrowZonesResponse{
+    ProjectId project_id = 100;
+    Status status = 1;
+    repeated string json_grow_zones = 2;
+}
+
+message SetActiveRecipeRequest {
+    ProjectId project_id = 100;
+    string json_grow_zone = 1;
+    string json_recipe = 2;
+}
+message GetActiveRecipesResponse {
+    ProjectId project_id = 100;
+    Status status = 1;
+    repeated string json_active_recipes = 2;
+}
+
+message SetCropRequest {
+    ProjectId project_id = 100;
+    string json_crop = 1;
+}
+
+message DeleteCropRequest {
+    ProjectId project_id = 100;
+    string crop_id = 1;
+}
+
+message GetCropsResponse {
+    ProjectId project_id = 100;
+    Status status = 1;
+    repeated string json_crops =2;
+}
+
+message GetAllInterfacesResponse {
+    Status status = 1;
+    repeated InterfaceModuleMessage interfaces = 2;
+}
+message IdentifyBusDeviceRequest {
+    repeated uint64 device_uids = 1;
+}
+message SetLightOutputRequest {
+    repeated uint64 device_uids = 1;
+    ChannelOutputsMessage outputs = 2;
+}
+message GetFirmwareOverviewResponse {
+    Status status = 1;
+    string firmware_repository_branch_name = 2;
+    repeated FirmwareReleaseMessage firmware_releases = 3;
+    bool auto_update_enabled = 4; // If the control box should auto update bus devices / interface submodule to the latest firmware
+}
+message SyncFirmwareRepositoryRequest {
+    string sync_branch_name = 1;
+}
+message UpdateInterfaceSubmoduleRequest {
+    // The controller will send the specified firmware (if valid) to the specified interface module.
+    // The inteface module will then update all connected submodules to that version automatically.
+    string interface_box_mac_address = 1;
+    GrowDeviceType target_device_type = 2;
+    VersionMessage firmware_version = 3;
+}
+
+message UpdateBusDevicesFirmwareRequest {
+    // The specified interface module will direct all connected submodules to broadcast the specified firmware
+    // on its bus.
+    string interface_box_mac_address = 1;
+    repeated string interface_submodule_serial_numbers = 2;
+    GrowDeviceType target_device_type = 3;
+    VersionMessage firmware_version = 4;
+}
+
+message ControllerSendDataToSubmoduleApiRequest {
+    string interface_box_mac_address = 1;
+    string interface_submodule_serial_number = 2;
+    bytes data = 3;
+}
+message ControllerSendDataToSubmoduleApiResponse {
+    Status status = 1;
+    bytes data = 2;
+}
+
+message ControllerBroadcastMessageOnBusRequest {
+    repeated string interface_submodule_serial_numbers = 1;
+    int32 relay_count = 2;
+    bytes data = 3;
+}
+
+
+ /*
+    _____ ______ _______ _______ _____ _   _  _____  _____ 
+   / ____|  ____|__   __|__   __|_   _| \ | |/ ____|/ ____|
+  | (___ | |__     | |     | |    | | |  \| | |  __| (___  
+   \___ \|  __|    | |     | |    | | | . ` | | |_ |\___ \ 
+   ____) | |____   | |     | |   _| |_| |\  | |__| |____) |
+  |_____/|______|  |_|     |_|  |_____|_| \_|\_____|_____/ 
+ */
+
+
+message SetBusDeviceSettingsRequest {
+    repeated uint64 device_uids = 1;
+    repeated GrowSettingsMessage settings = 2;
+}
+message SetInterfaceSubmoduleSettingsRequest {
+    repeated string serial_numbers = 1;
+    repeated GrowSettingsMessage settings = 2;
+}
+message SetInterfaceModuleSettingsRequest {
+    repeated string interface_box_mac_address = 1;
+    repeated InterfaceModuleSettings settings = 2;
+}
+message SetControllerSettingsRequest {
+    ControllerSettings settings = 1;
+}
+message PingServerRequest {
+    // The controller/server supports being pinged by clients
+    // This info will be stored per client and be accessible for all clients
+    string clientUUID = 1;
+    string clientLocalIp = 2;
+    string clientPublicIp = 3;
+    VersionMessage clientVersion = 4;
+}
+
+message ControllerSettings {
+    ProjectId project_id = 100;
+    float update_interface_module_interval_s = 1;
+    string firmware_repository_branch_name = 2;
+    // The controller will automatically update itself if this is set to true. (checks every minute)
+    bool auto_update_controller = 3; 
+    // The channel to use when looking for updates for the controller. Velopack is used internally to handle updates of controller software.
+    string appReleaseChannelForAutoUpdate = 4;
+    // This is the local timezone that all utc times will be adjusted by.
+    // Daylight savings and other factors will mess up timing if we only use UTC time.
+    string projectLocalTimezoneLocation = 5;
+    // Latitude and longitude of the site being controlled. This is used for estimating DLI
+    // at the grow site.
+    double latitude = 6;
+    double longitude = 7;
+    string power_area_json_string = 8;
+}

@@ -26,14 +26,15 @@ async def main():
     pretty_print_controller_info(controller_info)
     uids = get_light_uids_from_controller_info(controller_info)
     logging.info(f"Found {len(uids)} lights: {uids}")
-    did_set_light = await controller.set_light_output(uids, red=30, far_red=0, blue=30, white=0)
+    logging.info("Setting all lights to 15% red and 15% blue for 6 seconds")
+    did_set_light = await controller.set_light_output(uids, red=15, far_red=0, blue=15, white=0)
     if did_set_light:
         logging.info("Successfully set light output.")
     else:
         logging.info("Failed to set light output.")
 
     
-    logging.info("Waiting 6 seconds to let the controller update data, reading info, and then turning off lights")
+    logging.info("Waiting 6 seconds to let the controller update data, reading info, and then turning off lights\n")
     await asyncio.sleep(6)
 
     controller_info = await controller.get_controller_info()

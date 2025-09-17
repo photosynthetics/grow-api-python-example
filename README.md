@@ -18,7 +18,7 @@ Install the example. Include the last dot (.)
 ## Generating gRPC code from proto files
 
 The proto files are located in the `proto` directory. You can use the provided script to compile the proto files into python code.
-This has already been done, and the proto file is in the __init__.py file in the `src/grow_api_python_example` directory.
+This has already been done, and the generated code is located in the `__init__.py` file in the `src/grow_api_python_example` directory.
 
     python scripts/script_compile_proto_file.py
 
